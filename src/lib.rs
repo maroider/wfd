@@ -5,8 +5,8 @@ extern crate winapi;
 use crate::winapi::Interface;
 
 use std::ffi::OsString;
-use std::os::windows::ffi::OsStringExt;
-use std::path::PathBuf;
+use std::os::windows::ffi::{OsStrExt, OsStringExt};
+use std::path::{Path, PathBuf};
 use std::ptr::null_mut;
 use std::slice;
 
@@ -65,6 +65,12 @@ impl NullTermUTF16 for str {
     }
 }
 
+impl NullTermUTF16 for Path {
+    fn as_null_term_utf16(&self) -> Vec<u16> {
+        self.as_os_str().encode_wide().chain(Some(0)).collect()
+    }
+}
+
 const SFGAO_FILESYSTEM: u32 = 0x4000_0000;
 
 type FileExtensionFilterPair<'a> = (&'a str, &'a str);
@@ -79,7 +85,7 @@ pub struct DialogParams<'a> {
     pub default_extension: &'a str,
     /// The path to the default folder that the dialog will navigate to on first usage. Subsequent
     /// usages of the dialog will remember the directory of the last selected file/folder.
-    pub default_folder: &'a str,
+    pub default_folder: &'a Path,
     /// The filename to pre-populate in the dialog box
     pub file_name: &'a str,
     /// The label to display to the left of the filename input box in the dialog
@@ -94,7 +100,7 @@ pub struct DialogParams<'a> {
     /// The path to the folder that is always selected when a dialog is opened, regardless of
     /// previous user action. This is not recommended for general use, instead `default_folder`
     /// should be used.
-    pub folder: &'a str,
+    pub folder: &'a Path,
     /// The text label to replace the default "Open" or "Save" text on the "OK" button of the dialog
     pub ok_button_label: &'a str,
     /// A set of bit flags to apply to the dialog. Setting invalid flags will result in the dialog
@@ -104,7 +110,7 @@ pub struct DialogParams<'a> {
     /// The path to the existing file to use when opening a Save As dialog. Acts as a combination of
     /// `folder` and `file_name`, displaying the file name in the edit box, and selecting the
     /// containing folder as the initial folder in the dialog.
-    pub save_as_item: &'a str,
+    pub save_as_item: &'a Path,
     /// The text displayed in the title bar of the dialog box
     pub title: &'a str
 }
@@ -113,15 +119,15 @@ impl<'a> Default for DialogParams<'a> {
     fn default() -> Self {
         DialogParams {
             default_extension: "",
-            default_folder: "",
+            default_folder: "".as_ref(),
             file_name: "",
             file_name_label: "",
             file_type_index: 1,
             file_types: vec![("All types (*.*)", "*.*")],
-            folder: "",
+            folder: "".as_ref(),
             ok_button_label: "",
             options: 0,
-            save_as_item: "",
+            save_as_item: "".as_ref(),
             title: "",
         }
     }
@@ -340,7 +346,7 @@ pub fn save_dialog(params: DialogParams) -> Result<SaveDialogResult, DialogError
     let file_save_dialog = unsafe { &*file_save_dialog };
 
     // IFileDialog::SetSaveAsItem
-    if params.save_as_item != "" {
+    if params.save_as_item != Path::new("") {
         let mut item: *mut IShellItem = null_mut();
         let path = params.save_as_item.as_null_term_utf16();
         com!(SHCreateItemFromParsingName(path.as_ptr(), null_mut(), &IShellItem::uuidof(), &mut item as *mut *mut IShellItem as *mut *mut c_void), "SHCreateItemFromParsingName")?;
@@ -408,7 +414,7 @@ fn configure_file_dialog(file_dialog: &IFileDialog, params: &DialogParams) -> Re
     }
 
     // IFileDialog::SetDefaultFolder
-    if params.default_folder != "" {
+    if params.default_folder != Path::new("") {
         let mut default_folder: *mut IShellItem = null_mut();
         let path = params.default_folder.as_null_term_utf16();
         com!(SHCreateItemFromParsingName(path.as_ptr(), null_mut(), &IShellItem::uuidof(), &mut default_folder as *mut *mut IShellItem as *mut *mut c_void), "SHCreateItemFromParsingName")?;
@@ -420,7 +426,7 @@ fn configure_file_dialog(file_dialog: &IFileDialog, params: &DialogParams) -> Re
     }
 
     // IFileDialog::SetFolder
-    if params.folder != "" {
+    if params.folder != Path::new("") {
         let mut folder: *mut IShellItem = null_mut();
         let path = params.folder.as_null_term_utf16();
         com!(SHCreateItemFromParsingName(path.as_ptr(), null_mut(), &IShellItem::uuidof(), &mut folder as *mut *mut IShellItem as *mut *mut c_void), "SHCreateItemFromParsingName")?;

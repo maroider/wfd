@@ -6,7 +6,7 @@ fn main() {
     let params = DialogParams {
         file_types: vec![("DLL Files", "*.dll"), ("Executable Files", "*.exe;*.com;*.scr")],
         default_extension: "dll",
-        default_folder: r"C:\Windows\System32",
+        default_folder: r"C:\Windows\System32".as_ref(),
         file_name: "win32k.sys",
         file_name_label: "Select some files!",
         file_type_index: 1,
